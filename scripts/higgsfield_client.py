@@ -38,15 +38,24 @@ def _auth_header():
     return {"Authorization": f"Key {key_id}:{key_secret}"}
 
 
-def submit_image_job(prompt, aspect_ratio="4:5", resolution="1080p"):
-    """Submits one image generation job, returns the status_url to poll."""
+def submit_image_job(prompt, aspect_ratio="3:4", resolution="720p"):
+    """
+    Submits one image generation job, returns the status_url to poll.
+
+    Valid aspect_ratio values for the Soul model (confirmed 2026-08-24 after
+    a live 422 on "4:5", which is NOT valid): 9:16, 3:4, 2:3, 1:1, 4:3, 16:9,
+    3:2. "3:4" is the closest portrait ratio to the carousel's actual 4:5
+    render target -- make_slides.py cover-crops to 1080x1350 regardless, so
+    the exact source ratio doesn't need to match exactly.
+    """
     resp = requests.post(
         GENERATE_ENDPOINT,
         headers={**_auth_header(), "Content-Type": "application/json"},
         json={"prompt": prompt, "aspect_ratio": aspect_ratio, "resolution": resolution},
         timeout=30,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        raise GenerationFailed(f"HTTP {resp.status_code} from Higgsfield: {resp.text[:500]}")
     data = resp.json()
     status_url = data.get("status_url")
     if not status_url:
@@ -83,7 +92,7 @@ def download_image(image_url, out_path):
     return out_path
 
 
-def generate_image(prompt, out_path, aspect_ratio="4:5", resolution="1080p", max_retries=2):
+def generate_image(prompt, out_path, aspect_ratio="3:4", resolution="720p", max_retries=2):
     """
     End-to-end: submit -> poll -> download. Retries once (with the same
     prompt) if the job fails for a transient reason. NEVER retries past
