@@ -3,11 +3,6 @@ Thin client for Buffer's public GraphQL API (api.buffer.com), used to
 create scheduled posts directly from GitHub Actions with no browser.
 
 Docs referenced: https://developers.buffer.com/examples/create-image-post.html
-The schema for `channels` (listing connected channels/profiles) was not
-directly confirmed against a live example at the time this was written
--- it's a best-effort guess based on the documented shape of the API. If
-`get_channel_id` errors, check developers.buffer.com for the current
-`channels`/`profiles` query shape and adjust below.
 
 Multi-image (carousel) posts: `assets` is documented as an ordered list
 where each entry is exactly one of image/video/document/link, which
@@ -37,9 +32,20 @@ def _graphql(query, variables=None):
     return data["data"]
 
 
+_ORGANIZATIONS_QUERY = """
+query GetOrganizations {
+  account {
+    organizations {
+      id
+      name
+    }
+  }
+}
+"""
+
 _CHANNELS_QUERY = """
-query ListChannels {
-  channels {
+query GetChannels($organizationId: String!) {
+  channels(input: { organizationId: $organizationId }) {
     id
     name
     service
@@ -47,10 +53,34 @@ query ListChannels {
 }
 """
 
+_org_id_cache = None
+
+
+def get_organization_id():
+    """
+    Returns the first organization id on this Buffer account. Confirmed
+    2026-08-24 (after a live GraphQL error) that `channels` requires an
+    organizationId -- fetched via this separate `account.organizations`
+    query, per developers.buffer.com/examples/get-organizations.html.
+    If the account has multiple organizations/workspaces, this picks the
+    first one -- fine here since both bot accounts (workoutnow768,
+    podcasterclips) are single-organization Buffer Free-plan accounts.
+    """
+    global _org_id_cache
+    if _org_id_cache:
+        return _org_id_cache
+    data = _graphql(_ORGANIZATIONS_QUERY)
+    orgs = (data.get("account") or {}).get("organizations") or []
+    if not orgs:
+        raise RuntimeError("No organizations found on this Buffer account.")
+    _org_id_cache = orgs[0]["id"]
+    return _org_id_cache
+
 
 def list_channels():
     """Returns [{"id": ..., "name": ..., "service": ...}, ...] for the authenticated account."""
-    data = _graphql(_CHANNELS_QUERY)
+    org_id = get_organization_id()
+    data = _graphql(_CHANNELS_QUERY, {"organizationId": org_id})
     return data.get("channels", [])
 
 
@@ -97,6 +127,13 @@ def create_post(channel_name, text, image_urls, scheduled_at_iso8601):
     """
     Schedules one post to one channel with one or more images.
     scheduled_at_iso8601: e.g. "2026-08-26T19:00:00Z"
+
+    Confirmed 2026-08-24 (after a live GraphQL error) that "custom"/
+    "scheduledAt" are wrong -- the actual shape per
+    developers.buffer.com/guides/posts-and-scheduling.html is
+    schedulingType: automatic (always this, regardless of timing) with
+    mode: customScheduled and a "dueAt" field (not scheduledAt) for the
+    specific timestamp.
     """
     channel_id = get_channel_id(channel_name)
     assets = [{"image": {"url": url}} for url in image_urls]
@@ -104,8 +141,9 @@ def create_post(channel_name, text, image_urls, scheduled_at_iso8601):
         "input": {
             "text": text,
             "channelId": channel_id,
-            "schedulingType": "custom",
-            "scheduledAt": scheduled_at_iso8601,
+            "schedulingType": "automatic",
+            "mode": "customScheduled",
+            "dueAt": scheduled_at_iso8601,
             "assets": assets,
         }
     }
