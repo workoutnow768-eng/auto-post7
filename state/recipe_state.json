@@ -1,10 +1,14 @@
 {
   "_comment": "Bot-maintained rotation state for the food/recipe pipeline, mirroring the manual recipe-page/state.json this was seeded from. Do not hand-edit last_day_index/scheduled_up_to while the bot is running on schedule -- it owns these fields.",
-  "last_day_index": 23,
-  "scheduled_up_to": "2026-08-25T14:00:00Z",
-  "last_run_at": "2026-08-24T19:00:00Z",
-  "last_run_slot": "seeded_from_manual_pipeline",
+  "last_day_index": 26,
+  "scheduled_up_to": "2026-08-26T19:00:00Z",
+  "last_run_at": "2026-08-24T21:17:04Z",
+  "last_run_slot": "github_actions_autonomous_bot",
   "posts_per_day": 3,
-  "daily_time_slots_uk": ["09:00", "15:00", "19:00"],
+  "daily_time_slots_uk": [
+    "09:00",
+    "15:00",
+    "19:00"
+  ],
   "notes": "Seeded 2026-08-24 from the manual recipe-page project's state.json at the point the GitHub Actions bot took over. See that project's README for full history prior to this point. skipped_recipe_indices [11] from the manual pipeline is not carried forward here -- the bot just rotates through the full RECIPES bank in order, wrapping via modulo."
 }
