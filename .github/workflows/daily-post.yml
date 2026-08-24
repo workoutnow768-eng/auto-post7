@@ -1,0 +1,85 @@
+name: Daily Content Bot
+
+on:
+  schedule:
+    # 17:00 UTC daily -- ahead of the earliest 09:00 UK posting slot for
+    # the *next* day, giving Buffer's own queue time to pick posts up.
+    - cron: "0 17 * * *"
+  workflow_dispatch: {}  # lets you trigger a manual test run from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install fonts (for carousel text rendering)
+        run: sudo apt-get update && sudo apt-get install -y fonts-dejavu-core
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # --- Recipe (food) pipeline ---
+
+      - name: Generate recipe carousels
+        env:
+          HIGGSFIELD_API_KEY_ID: ${{ secrets.HIGGSFIELD_API_KEY_ID }}
+          HIGGSFIELD_API_KEY_SECRET: ${{ secrets.HIGGSFIELD_API_KEY_SECRET }}
+        run: python scripts/main.py generate recipe
+
+      - name: Commit + push recipe images (so Buffer can fetch them by URL)
+        run: |
+          git config user.name "social-bot"
+          git config user.email "social-bot@users.noreply.github.com"
+          git add output/recipe
+          git diff --cached --quiet || git commit -m "Recipe pipeline: images for $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Schedule recipe posts on Buffer
+        env:
+          BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
+        run: python scripts/main.py schedule recipe
+
+      - name: Commit recipe state
+        run: |
+          git config user.name "social-bot"
+          git config user.email "social-bot@users.noreply.github.com"
+          git add state/recipe_state.json output/recipe
+          git diff --cached --quiet || git commit -m "Recipe pipeline: state update $(date -u +%Y-%m-%d)"
+          git push
+
+      # --- Workout (fitness) pipeline ---
+
+      - name: Generate workout carousels
+        env:
+          HIGGSFIELD_API_KEY_ID: ${{ secrets.HIGGSFIELD_API_KEY_ID }}
+          HIGGSFIELD_API_KEY_SECRET: ${{ secrets.HIGGSFIELD_API_KEY_SECRET }}
+        run: python scripts/main.py generate workout
+
+      - name: Commit + push workout images (so Buffer can fetch them by URL)
+        run: |
+          git config user.name "social-bot"
+          git config user.email "social-bot@users.noreply.github.com"
+          git add output/workout
+          git diff --cached --quiet || git commit -m "Workout pipeline: images for $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Schedule workout posts on Buffer
+        env:
+          BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
+        run: python scripts/main.py schedule workout
+
+      - name: Commit workout state
+        run: |
+          git config user.name "social-bot"
+          git config user.email "social-bot@users.noreply.github.com"
+          git add state/workout_state.json output/workout
+          git diff --cached --quiet || git commit -m "Workout pipeline: state update $(date -u +%Y-%m-%d)"
+          git push
