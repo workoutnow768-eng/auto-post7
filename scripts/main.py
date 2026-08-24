@@ -1,193 +1,154 @@
 """
-Orchestrator for one pipeline run (recipe or workout). Runs headlessly in
-GitHub Actions -- generates images via Higgsfield's REST API, renders
-carousels locally, and schedules posts via Buffer's GraphQL API.
+Thin client for Buffer's public GraphQL API (api.buffer.com), used to
+create scheduled posts directly from GitHub Actions with no browser.
 
-Split into two phases (see workflow YAML), because Buffer needs to fetch
-each image from its public raw.githubusercontent.com URL -- which only
-exists AFTER the rendered images are committed and pushed. Running
-"schedule" before that push happens would hand Buffer a URL that 404s.
+Docs referenced: https://developers.buffer.com/examples/create-image-post.html
 
-  generate: renders all of today's carousels, writes a manifest.json per
-            pipeline listing image paths + captions + scheduled times.
-            The workflow then commits + pushes these images.
-  schedule: reads the manifest (now safely live on raw.githubusercontent
-            .com) and creates the actual Buffer posts, then updates
-            state/*.json and bumps the rotation index.
-
-Usage: python scripts/main.py generate recipe
-       python scripts/main.py schedule recipe
+Multi-image (carousel) posts: `assets` is documented as an ordered list
+where each entry is exactly one of image/video/document/link, which
+should support N images by passing N `{"image": {"url": ...}}` entries
+-- same idea as attaching multiple photos in the Buffer web composer.
+This has NOT been verified end-to-end against a live account yet (no
+valid token available in this environment) -- watch the first real run
+closely in Buffer's queue.
 """
 import os
-import sys
-import json
-import datetime
+import requests
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-import higgsfield_client
-import buffer_client
-import make_slides
-
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-PIPELINES = {
-    "recipe": {
-        "state_path": os.path.join(REPO_ROOT, "state", "recipe_state.json"),
-        "output_subdir": "output/recipe",
-        "channels": ["ai_facts4u", "daily_ai_factz", "Factual days"],
-        "ideas_module": "recipe_ideas",
-        "ideas_attr": "RECIPES",
-        "prompts_module": "image_prompts_recipe",
-        "prompts_func": "build_prompts_for_recipe",
-    },
-    "workout": {
-        "state_path": os.path.join(REPO_ROOT, "state", "workout_state.json"),
-        "output_subdir": "output/workout",
-        "channels": ["30secfitness", "30sec_fitness", "Crunch time"],
-        "ideas_module": "workout_ideas",
-        "ideas_attr": "WORKOUTS",
-        "prompts_module": "image_prompts_workout",
-        "prompts_func": "build_prompts_for_workout",
-    },
-}
+API_URL = "https://api.buffer.com"
 
 
-def manifest_path(cfg):
-    return os.path.join(REPO_ROOT, cfg["output_subdir"], "manifest.json")
+def _headers():
+    token = os.environ["BUFFER_ACCESS_TOKEN"]
+    return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 
-def load_state(path):
-    with open(path) as f:
-        return json.load(f)
+def _graphql(query, variables=None):
+    resp = requests.post(API_URL, headers=_headers(), json={"query": query, "variables": variables or {}}, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    if "errors" in data and data["errors"]:
+        raise RuntimeError(f"Buffer GraphQL error: {data['errors']}")
+    return data["data"]
 
 
-def save_state(path, state):
-    with open(path, "w") as f:
-        json.dump(state, f, indent=2)
-        f.write("\n")
-
-
-def raw_url(repo_relative_path):
-    repo = os.environ.get("GITHUB_REPOSITORY")  # "owner/repo"
-    branch = os.environ.get("GITHUB_REF_NAME", "main")
-    if not repo:
-        raise RuntimeError("GITHUB_REPOSITORY env var not set -- are you running outside GitHub Actions?")
-    return f"https://raw.githubusercontent.com/{repo}/{branch}/{repo_relative_path}"
-
-
-def next_scheduled_times(state, count):
-    """Returns `count` ISO8601 UTC timestamps, continuing from state['scheduled_up_to'],
-    stepping through state['daily_time_slots_uk'] (approximated as UTC -- London is
-    UTC+0 in winter/UTC+1 in summer; good enough for a daily cadence, not
-    minute-precise)."""
-    slots = state["daily_time_slots_uk"]
-    last = datetime.datetime.fromisoformat(state["scheduled_up_to"].replace("Z", "+00:00"))
-    day = last.date() + datetime.timedelta(days=1)
-    times = []
-    for i in range(count):
-        slot = slots[i % len(slots)]
-        hh, mm = [int(x) for x in slot.split(":")]
-        dt = datetime.datetime(day.year, day.month, day.day, hh, mm, tzinfo=datetime.timezone.utc)
-        times.append(dt)
-        if (i + 1) % len(slots) == 0:
-            day = day + datetime.timedelta(days=1)
-    return times
-
-
-def phase_generate(name):
-    cfg = PIPELINES[name]
-    state = load_state(cfg["state_path"])
-
-    ideas_module = __import__(cfg["ideas_module"])
-    bank = getattr(ideas_module, cfg["ideas_attr"])
-    prompts_module = __import__(cfg["prompts_module"])
-    build_prompts = getattr(prompts_module, cfg["prompts_func"])
-
-    posts_per_day = state.get("posts_per_day", 3)
-    count = posts_per_day
-    start_index = state["last_day_index"] + 1
-
-    scheduled_times = next_scheduled_times(state, count)
-    today_tag = datetime.datetime.utcnow().strftime("%Y%m%d")
-
-    manifest_items = []
-
-    for i in range(count):
-        bank_index = (start_index + i) % len(bank)
-        item = bank[bank_index]
-        slug = item["title"].lower().replace(" ", "_").replace("(", "").replace(")", "").replace("/", "-")[:40]
-        item_out_dir = os.path.join(REPO_ROOT, cfg["output_subdir"], f"{today_tag}_{slug}")
-        os.makedirs(item_out_dir, exist_ok=True)
-
-        prompts = build_prompts(item)
-        photo_paths = []
-        for slide_i, prompt in enumerate(prompts, start=1):
-            out_path = os.path.join(item_out_dir, f"source_{slide_i}.png")
-            try:
-                higgsfield_client.generate_image(prompt, out_path)
-                photo_paths.append(out_path)
-            except higgsfield_client.GenerationBlocked:
-                print(f"[SAFETY] Slide {slide_i} of '{item['title']}' was flagged nsfw by Higgsfield -- "
-                      f"skipping this photo, slide will render on a placeholder background instead.")
-                photo_paths.append(None)
-            except higgsfield_client.GenerationFailed as e:
-                print(f"[WARN] Slide {slide_i} of '{item['title']}' failed to generate: {e} -- using placeholder.")
-                photo_paths.append(None)
-
-        slide_paths = make_slides.render_carousel(item, bank_index, item_out_dir, photo_paths=photo_paths)
-        repo_relative_paths = [os.path.relpath(p, REPO_ROOT) for p in slide_paths]
-
-        manifest_items.append({
-            "title": item["title"],
-            "bank_index": bank_index,
-            "text": f"{item['caption']}\n\n{item['hashtags']}",
-            "image_repo_paths": repo_relative_paths,
-            "scheduled_at": scheduled_times[i].strftime("%Y-%m-%dT%H:%M:%SZ"),
-        })
-
-    manifest = {
-        "generated_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "start_index": start_index,
-        "count": count,
-        "final_scheduled_up_to": scheduled_times[-1].strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "items": manifest_items,
+_ORGANIZATIONS_QUERY = """
+query GetOrganizations {
+  account {
+    organizations {
+      id
+      name
     }
-    os.makedirs(os.path.dirname(manifest_path(cfg)), exist_ok=True)
-    with open(manifest_path(cfg), "w") as f:
-        json.dump(manifest, f, indent=2)
-    print(f"[OK] Generated {count} carousels for '{name}'. Manifest written to {manifest_path(cfg)}")
+  }
+}
+"""
+
+_CHANNELS_QUERY = """
+query GetChannels($organizationId: String!) {
+  channels(input: { organizationId: $organizationId }) {
+    id
+    name
+    service
+  }
+}
+"""
+
+_org_id_cache = None
 
 
-def phase_schedule(name):
-    cfg = PIPELINES[name]
-    state = load_state(cfg["state_path"])
-
-    with open(manifest_path(cfg)) as f:
-        manifest = json.load(f)
-
-    for item in manifest["items"]:
-        image_urls = [raw_url(p) for p in item["image_repo_paths"]]
-        for channel_name in cfg["channels"]:
-            try:
-                buffer_client.create_post(channel_name, item["text"], image_urls, item["scheduled_at"])
-                print(f"[OK] Scheduled '{item['title']}' to {channel_name} for {item['scheduled_at']}")
-            except Exception as e:
-                print(f"[ERROR] Failed to schedule '{item['title']}' to {channel_name}: {e}")
-
-    state["last_day_index"] = manifest["start_index"] + manifest["count"] - 1
-    state["scheduled_up_to"] = manifest["final_scheduled_up_to"]
-    state["last_run_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    state["last_run_slot"] = "github_actions_autonomous_bot"
-    save_state(cfg["state_path"], state)
-
-    # manifest served its purpose; remove so it doesn't get committed/confused with next run
-    os.remove(manifest_path(cfg))
+def get_organization_id():
+    """
+    Returns the first organization id on this Buffer account. Confirmed
+    2026-08-24 (after a live GraphQL error) that `channels` requires an
+    organizationId -- fetched via this separate `account.organizations`
+    query, per developers.buffer.com/examples/get-organizations.html.
+    If the account has multiple organizations/workspaces, this picks the
+    first one -- fine here since both bot accounts (workoutnow768,
+    podcasterclips) are single-organization Buffer Free-plan accounts.
+    """
+    global _org_id_cache
+    if _org_id_cache:
+        return _org_id_cache
+    data = _graphql(_ORGANIZATIONS_QUERY)
+    orgs = (data.get("account") or {}).get("organizations") or []
+    if not orgs:
+        raise RuntimeError("No organizations found on this Buffer account.")
+    _org_id_cache = orgs[0]["id"]
+    return _org_id_cache
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] not in ("generate", "schedule") or sys.argv[2] not in PIPELINES:
-        print(f"Usage: python main.py <generate|schedule> <{'|'.join(PIPELINES)}>")
-        sys.exit(1)
-    phase, pipeline = sys.argv[1], sys.argv[2]
-    (phase_generate if phase == "generate" else phase_schedule)(pipeline)
+def list_channels():
+    """Returns [{"id": ..., "name": ..., "service": ...}, ...] for the authenticated account."""
+    org_id = get_organization_id()
+    data = _graphql(_CHANNELS_QUERY, {"organizationId": org_id})
+    return data.get("channels", [])
+
+
+_channel_cache = {}
+
+
+def get_channel_id(channel_name):
+    """Looks up a channel's id by exact display name, case-sensitive match first,
+    falling back to case-insensitive. Raises if not found or ambiguous."""
+    if not _channel_cache:
+        for ch in list_channels():
+            _channel_cache[ch["name"]] = ch["id"]
+
+    if channel_name in _channel_cache:
+        return _channel_cache[channel_name]
+
+    lowered = channel_name.strip().lower()
+    matches = [cid for name, cid in _channel_cache.items() if name.strip().lower() == lowered]
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise RuntimeError(
+            f"No Buffer channel found named '{channel_name}'. "
+            f"Available channels: {list(_channel_cache.keys())}"
+        )
+    raise RuntimeError(f"Multiple channels matched '{channel_name}': {matches}")
+
+
+_CREATE_POST_MUTATION = """
+mutation CreatePost($input: CreatePostInput!) {
+  createPost(input: $input) {
+    ... on PostActionSuccess {
+      post { id text }
+    }
+    ... on MutationError {
+      message
+    }
+  }
+}
+"""
+
+
+def create_post(channel_name, text, image_urls, scheduled_at_iso8601):
+    """
+    Schedules one post to one channel with one or more images.
+    scheduled_at_iso8601: e.g. "2026-08-26T19:00:00Z"
+
+    Confirmed 2026-08-24 (after a live GraphQL error) that "custom"/
+    "scheduledAt" are wrong -- the actual shape per
+    developers.buffer.com/guides/posts-and-scheduling.html is
+    schedulingType: automatic (always this, regardless of timing) with
+    mode: customScheduled and a "dueAt" field (not scheduledAt) for the
+    specific timestamp.
+    """
+    channel_id = get_channel_id(channel_name)
+    assets = [{"image": {"url": url}} for url in image_urls]
+    variables = {
+        "input": {
+            "text": text,
+            "channelId": channel_id,
+            "schedulingType": "automatic",
+            "mode": "customScheduled",
+            "dueAt": scheduled_at_iso8601,
+            "assets": assets,
+        }
+    }
+    result = _graphql(_CREATE_POST_MUTATION, variables)
+    payload = result.get("createPost", {})
+    if "message" in payload:
+        raise RuntimeError(f"Buffer rejected the post for '{channel_name}': {payload['message']}")
+    return payload.get("post")
