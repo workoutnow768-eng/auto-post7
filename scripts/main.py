@@ -35,11 +35,23 @@ PIPELINES = {
     "recipe": {
         "state_path": os.path.join(REPO_ROOT, "state", "recipe_state.json"),
         "output_subdir": "output/recipe",
-        "channels": ["ai_facts4u", "daily_ai_factz", "Factual days"],
+        # "Factual days" (the YouTube channel) is intentionally excluded --
+        # confirmed 2026-08-26 in the manual Buffer web flow that Buffer
+        # requires video content for YouTube and blocks image-only carousels
+        # with "Please include a video." This pipeline only generates image
+        # carousels, so Factual days should only be added back once a
+        # video-capable path exists.
+        "channels": ["ai_facts4u", "daily_ai_factz"],
         "ideas_module": "recipe_ideas",
         "ideas_attr": "RECIPES",
         "prompts_module": "image_prompts_recipe",
         "prompts_func": "build_prompts_for_recipe",
+        # Separate Buffer account (podcasterclips) from the workout pipeline
+        # -- FIX 2026-08-26: previously both pipelines shared one
+        # BUFFER_ACCESS_TOKEN secret, which meant the recipe pipeline was
+        # silently querying the WORKOUT account's channels and failing
+        # 100% of the time. See buffer_client.py's module docstring.
+        "buffer_token_env": "BUFFER_ACCESS_TOKEN_RECIPE",
     },
     "workout": {
         "state_path": os.path.join(REPO_ROOT, "state", "workout_state.json"),
@@ -49,6 +61,8 @@ PIPELINES = {
         "ideas_attr": "WORKOUTS",
         "prompts_module": "image_prompts_workout",
         "prompts_func": "build_prompts_for_workout",
+        # Separate Buffer account (workoutnow768) from the recipe pipeline.
+        "buffer_token_env": "BUFFER_ACCESS_TOKEN_WORKOUT",
     },
 }
 
@@ -173,7 +187,9 @@ def phase_schedule(name):
         for channel_name in cfg["channels"]:
             attempt_count += 1
             try:
-                buffer_client.create_post(channel_name, item["text"], image_urls, item["scheduled_at"])
+                buffer_client.create_post(
+                    channel_name, item["text"], image_urls, item["scheduled_at"], cfg["buffer_token_env"]
+                )
                 print(f"[OK] Scheduled '{item['title']}' to {channel_name} for {item['scheduled_at']}")
                 success_count += 1
             except Exception as e:

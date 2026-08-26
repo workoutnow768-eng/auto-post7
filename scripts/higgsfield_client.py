@@ -18,7 +18,15 @@ import time
 import requests
 
 BASE_URL = "https://platform.higgsfield.ai"
-GENERATE_ENDPOINT = f"{BASE_URL}/higgsfield-ai/soul/standard"
+# FIX 2026-08-26: this was missing "/v2/" -- confirmed against the live docs
+# (docs.higgsfield.ai/docs/guides/images and /docs/models) that the Soul
+# endpoint is versioned. The un-versioned path 404s, which was being
+# silently swallowed by generate_image()'s except clause and falling back
+# to a placeholder gradient -- EVERY image this bot has generated so far
+# (both "successful" and failed runs) was a blank placeholder, never a
+# real photo. Confirmed by downloading and viewing the actual committed
+# PNGs from the Aug 24 and Aug 25 runs.
+GENERATE_ENDPOINT = f"{BASE_URL}/higgsfield-ai/soul/v2/standard"
 
 POLL_INTERVAL_SECONDS = 5
 POLL_TIMEOUT_SECONDS = 180
@@ -50,7 +58,7 @@ def submit_image_job(prompt, aspect_ratio="3:4", resolution="720p"):
     """
     resp = requests.post(
         GENERATE_ENDPOINT,
-        headers={**_auth_header(), "Content-Type": "application/json"},
+        headers={**_auth_header(), "Content-Type": "application/json", "Accept": "application/json"},
         json={"prompt": prompt, "aspect_ratio": aspect_ratio, "resolution": resolution},
         timeout=30,
     )
