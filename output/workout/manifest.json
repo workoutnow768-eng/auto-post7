@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-08-26T21:12:00Z",
+  "start_index": 13,
+  "count": 3,
+  "final_scheduled_up_to": "2026-08-29T19:00:00Z",
+  "items": [
+    {
+      "title": "Do You Really Need Rest Days?",
+      "bank_index": 13,
+      "text": "Rest days aren't laziness \u2014 they're literally where the gains happen \ud83d\ude34\ud83d\udcaa\n\n#restday #recovery #fitnessfacts #gymtok #fitnesstiktok",
+      "image_repo_paths": [
+        "output/workout/20260826_do_you_really_need_rest_days/slide_1.jpg",
+        "output/workout/20260826_do_you_really_need_rest_days/slide_2.jpg",
+        "output/workout/20260826_do_you_really_need_rest_days/slide_3.jpg",
+        "output/workout/20260826_do_you_really_need_rest_days/slide_4.jpg"
+      ],
+      "scheduled_at": "2026-08-29T09:00:00Z"
+    },
+    {
+      "title": "5-Minute Ab Burnout (No Equipment)",
+      "bank_index": 0,
+      "text": "5 minutes, zero equipment, real burn \u2014 no excuses today \ud83d\udd25\ud83d\udcaa\n\n#absworkout #noequipment #homeworkout #corestrength #fitnesstiktok",
+      "image_repo_paths": [
+        "output/workout/20260826_5minute_ab_burnout_no_equipment/slide_1.jpg",
+        "output/workout/20260826_5minute_ab_burnout_no_equipment/slide_2.jpg",
+        "output/workout/20260826_5minute_ab_burnout_no_equipment/slide_3.jpg",
+        "output/workout/20260826_5minute_ab_burnout_no_equipment/slide_4.jpg",
+        "output/workout/20260826_5minute_ab_burnout_no_equipment/slide_5.jpg"
+      ],
+      "scheduled_at": "2026-08-29T15:00:00Z"
+    },
+    {
+      "title": "Beginner Leg Day (Bodyweight)",
+      "bank_index": 1,
+      "text": "No gym, no gear \u2014 just a real beginner leg day that actually works \ud83e\uddb5\n\n#legday #beginnerworkout #bodyweight #homeworkout #fitnesstiktok",
+      "image_repo_paths": [
+        "output/workout/20260826_beginner_leg_day_bodyweight/slide_1.jpg",
+        "output/workout/20260826_beginner_leg_day_bodyweight/slide_2.jpg",
+        "output/workout/20260826_beginner_leg_day_bodyweight/slide_3.jpg",
+        "output/workout/20260826_beginner_leg_day_bodyweight/slide_4.jpg"
+      ],
+      "scheduled_at": "2026-08-29T19:00:00Z"
+    }
+  ]
+}
