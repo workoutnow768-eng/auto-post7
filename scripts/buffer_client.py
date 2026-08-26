@@ -101,9 +101,10 @@ def list_channels(token_env):
 _channel_cache = {}  # keyed by token_env -> {label: channel_id}
 
 
-def get_channel_id(channel_name, token_env):
-    """Looks up a channel's id by exact display name, case-sensitive match first,
-    falling back to case-insensitive. Raises if not found or ambiguous.
+def get_channel(channel_name, token_env):
+    """Looks up a channel's full record ({id, name, displayName, service}) by
+    exact display name, case-sensitive match first, falling back to
+    case-insensitive. Raises if not found or ambiguous.
 
     Matches against BOTH `name` (Buffer's handle/username field) and
     `displayName` (a custom label users can set -- names like "Crunch time"
@@ -115,7 +116,7 @@ def get_channel_id(channel_name, token_env):
         for ch in list_channels(token_env):
             for label in (ch.get("name"), ch.get("displayName")):
                 if label:
-                    by_label[label] = ch["id"]
+                    by_label[label] = ch
         _channel_cache[token_env] = by_label
     cache = _channel_cache[token_env]
 
@@ -123,15 +124,42 @@ def get_channel_id(channel_name, token_env):
         return cache[channel_name]
 
     lowered = channel_name.strip().lower()
-    matches = {cid for name, cid in cache.items() if name.strip().lower() == lowered}
+    matches = {name: ch for name, ch in cache.items() if name.strip().lower() == lowered}
     if len(matches) == 1:
-        return next(iter(matches))
+        return next(iter(matches.values()))
     if not matches:
         raise RuntimeError(
             f"No Buffer channel found named '{channel_name}' on the account for {token_env}. "
             f"Available channels: {sorted(set(cache.keys()))}"
         )
     raise RuntimeError(f"Multiple channels matched '{channel_name}': {matches}")
+
+
+def get_channel_id(channel_name, token_env):
+    """Back-compat wrapper -- returns just the id."""
+    return get_channel(channel_name, token_env)["id"]
+
+
+# FIX 2026-08-26 (round 2): Instagram and Facebook both reject a post with
+# "Invalid post: Instagram/Facebook posts require a type (post, story, or
+# reel)." unless a channel-specific `metadata` block is sent -- confirmed via
+# a live Actions run log (run #7) where every Instagram/Facebook channel
+# failed with exactly that message while the TikTok channel in the same
+# pipeline succeeded with no metadata at all. Per
+# developers.buffer.com/types/InstagramPostMetadataInput.html and
+# .../FacebookPostMetadataInput.html, both need a required `type` field
+# (PostType / PostTypeFacebook enum -- "post" is the plain-feed-post value
+# for both), and Instagram additionally requires `shouldShareToFeed` (a
+# non-nullable Boolean) whenever a feed post is being created.
+_METADATA_BY_SERVICE = {
+    "instagram": lambda: {"instagram": {"type": "post", "shouldShareToFeed": True}},
+    "facebook": lambda: {"facebook": {"type": "post"}},
+}
+
+
+def _metadata_for_service(service):
+    builder = _METADATA_BY_SERVICE.get((service or "").lower())
+    return builder() if builder else None
 
 
 _CREATE_POST_MUTATION = """
@@ -163,18 +191,20 @@ def create_post(channel_name, text, image_urls, scheduled_at_iso8601, token_env)
     mode: customScheduled and a "dueAt" field (not scheduledAt) for the
     specific timestamp.
     """
-    channel_id = get_channel_id(channel_name, token_env)
+    channel = get_channel(channel_name, token_env)
     assets = [{"image": {"url": url}} for url in image_urls]
-    variables = {
-        "input": {
-            "text": text,
-            "channelId": channel_id,
-            "schedulingType": "automatic",
-            "mode": "customScheduled",
-            "dueAt": scheduled_at_iso8601,
-            "assets": assets,
-        }
+    post_input = {
+        "text": text,
+        "channelId": channel["id"],
+        "schedulingType": "automatic",
+        "mode": "customScheduled",
+        "dueAt": scheduled_at_iso8601,
+        "assets": assets,
     }
+    metadata = _metadata_for_service(channel.get("service"))
+    if metadata:
+        post_input["metadata"] = metadata
+    variables = {"input": post_input}
     result = _graphql(_CREATE_POST_MUTATION, token_env, variables)
     payload = result.get("createPost", {})
     if "message" in payload:
