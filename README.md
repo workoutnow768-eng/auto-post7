@@ -103,6 +103,81 @@ for dynamic content generation) and the `anthropic` dependency that had
 been added but never wired into `main.py` and had no API key secret
 configured -- dead code, deleted rather than left dangling.
 
+## Fixed 2026-08-26, rounds 2-5 (post-mortem on runs #6-#8)
+
+Run #8 was the first fully clean run: 6/6 recipe posts and 9/9 workout
+posts scheduled, every channel, real photos confirmed by eye. It took
+four more rounds of fixes to get there:
+
+1. **Higgsfield credits live on a completely separate balance from the
+   main app account.** `not_enough_credits` (403) persisted even after
+   rotating the API key pair, despite the connected app/MCP account
+   showing 2,824 Ultra-plan credits. Root cause: **cloud.higgsfield.ai**
+   (the developer/Cloud API dashboard) is its own billing pool --
+   confirmed by checking it directly and finding 0 available credits, no
+   payment method saved. This is not the same balance shown in the app or
+   via the `balance` MCP tool. Top up credits (or enable Auto Top-up) on
+   cloud.higgsfield.ai specifically, not just the main Higgsfield app.
+2. **Instagram/Facebook posts need explicit `type` metadata.** Buffer
+   rejected every Instagram/Facebook post with "Invalid post: Instagram
+   posts require a type (post, story, or reel)." while the TikTok channel
+   in the same pipeline succeeded with no metadata at all (confirmed via
+   run #7's log). Fixed in `buffer_client.py`'s `create_post()`: now sends
+   `metadata: {instagram: {type: "post", shouldShareToFeed: true}}` or
+   `metadata: {facebook: {type: "post"}}` based on the channel's `service`
+   field, per developers.buffer.com's `InstagramPostMetadataInput` /
+   `FacebookPostMetadataInput` reference.
+3. **Titles with punctuation broke image URLs.** "Myth vs Fact: Does
+   Cardio Kill Gains?" produced a folder literally named
+   `..._does_cardio_kill_gains?` -- the bare `?` starts a URL query
+   string, truncating the `raw.githubusercontent.com` path before
+   `/slide_1.png`. Buffer's error was "Image could not be read from its
+   URL." Fixed in `main.py`: the slug generator now strips everything
+   except lowercase letters/digits/underscores instead of only stripping
+   parentheses.
+4. **Instagram's Content Publishing API only accepts JPEG, not PNG** --
+   confirmed against Meta's own developer docs ("JPEG is the only image
+   format supported... PNG is not supported") and a live Buffer error
+   ("Instagram is reporting that the image format isn't supported") on a
+   real (non-placeholder) post. `make_slides.py` now saves carousel
+   slides as `.jpg` (quality=92) instead of `.png`. The intermediate
+   Higgsfield source download (`source_N.png`) is unaffected -- Pillow
+   auto-detects its real format regardless of extension, and it's never
+   uploaded to Buffer directly.
+5. **Image generation was fully sequential -- doesn't scale past a couple
+   of pipelines.** Run #8's "Generate recipe carousels" step alone took
+   14m34s for just 3 items once real (non-instant-failing) generation was
+   happening -- each image legitimately takes 1-3 minutes, and the old
+   code awaited each one before starting the next. Fixed: `main.py` now
+   builds every item's prompts first, then hands the *entire* pipeline's
+   slide list to `higgsfield_client.generate_images_concurrent()` in one
+   batch (default 5 concurrent workers, tunable), so wall-clock time
+   approaches the slowest single image instead of the sum of all of them.
+   This matters a lot if/when more channels get added -- without it, each
+   additional pipeline would have added another ~10-15 minutes serially.
+
+## Scaling to more channels (8+)
+
+- **GitHub Actions compute is free and unlimited on public repos** --
+  confirmed against GitHub's own billing docs. This repo has to be public
+  anyway (Buffer needs public `raw.githubusercontent.com` URLs), so
+  adding pipelines costs nothing in Actions minutes.
+- **Buffer's free plan covers up to 3 channels per account, and the
+  ToS doesn't prohibit one person running multiple free accounts** --
+  since each niche needs its own TikTok/IG/FB accounts anyway, one free
+  Buffer account per niche (new email per account) is a natural fit, not
+  a workaround. Free-plan API limits (100 req/15min, 250/day, 3,000/30
+  days) are far more than a 3-post/day pipeline needs.
+- To add a niche: new Buffer account -> Personal Access Token -> new
+  GitHub secret (`BUFFER_ACCESS_TOKEN_<NICHE>`) -> new entry in
+  `main.py`'s `PIPELINES` dict. No other code changes needed -- the
+  `token_env` plumbing and concurrent image generation (see above) were
+  built to support this.
+- Higgsfield credit cost is the real budget line as this scales -- check
+  per-image cost on cloud.higgsfield.ai and multiply by
+  (posts/day x slides/post x channels) to estimate real monthly spend
+  before adding a lot of pipelines at once.
+
 ## Known open questions / things to verify on the next real run
 - **Multi-image carousel support**: Buffer's public GraphQL API's
   `assets` field is documented as an ordered list, which supports
@@ -113,7 +188,9 @@ configured -- dead code, deleted rather than left dangling.
 - Higgsfield's MCP connector (used in earlier manual sessions) explicitly
   does **not** honor the "Unlimited" plan toggle -- MCP and the
   developer API both always charge credits at standard rates. Budget
-  accordingly (roughly 4-5 images/day per pipeline, ~8-10 total).
+  accordingly (roughly 4-5 images/day per pipeline, ~8-10 total). See
+  also the separate-credit-pool note above -- MCP/app credits and Cloud
+  API credits are NOT the same balance.
 
 ## Fallback
 The original `requires_local_device: true` scheduled tasks
