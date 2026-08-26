@@ -176,6 +176,35 @@ def phase_generate(name):
     print(f"[INFO] Submitting {len(all_jobs)} image generation jobs for '{name}' (up to 5 concurrent)...")
     job_results, job_errors = higgsfield_client.generate_images_concurrent(all_jobs, max_workers=5)
 
+    # FIX 2026-08-26 (round 6, safety): never silently schedule
+    # placeholder-gradient posts to a real Buffer account again. This is
+    # exactly what happened in runs #6/#7 -- Higgsfield failures (bad
+    # endpoint, then 0 credits) were caught, logged as a [WARN], and the
+    # pipeline quietly carried on rendering placeholder backgrounds and
+    # scheduling them as if nothing were wrong; the GitHub Actions run
+    # still showed a green checkmark. An nsfw block (GenerationBlocked) is
+    # a normal, expected per-slide safety event and stays a placeholder for
+    # just that one slide -- but any GenerationFailed (bad credentials, 0
+    # credits, API outage, timeout) is a systemic problem, not a one-off,
+    # and should stop the whole pipeline loudly instead of posting
+    # placeholder carousels to a live audience. Raising here fails this
+    # step, which stops the job before the "Schedule ... posts on Buffer"
+    # step ever runs (no continue-on-error is set in the workflow), and
+    # GitHub's default notifications alert the repo owner on a failed run.
+    hard_failures = [
+        (i, err) for i, err in enumerate(job_errors)
+        if err is not None and not isinstance(err, higgsfield_client.GenerationBlocked)
+    ]
+    if hard_failures:
+        example_prompt = all_jobs[hard_failures[0][0]]["prompt"][:80]
+        raise RuntimeError(
+            f"{len(hard_failures)}/{len(all_jobs)} image generations failed for '{name}' with a "
+            f"non-safety error (first: {hard_failures[0][1]} on prompt '{example_prompt}...'). "
+            f"Refusing to render/schedule placeholder-image posts -- this usually means Higgsfield "
+            f"credits ran out or the API/credentials are broken. Check cloud.higgsfield.ai billing "
+            f"and the HIGGSFIELD_API_KEY_ID/SECRET secrets before re-running."
+        )
+
     manifest_items = []
     for i, meta in enumerate(items_meta):
         item = meta["item"]
