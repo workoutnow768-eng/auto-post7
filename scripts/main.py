@@ -126,7 +126,20 @@ def phase_generate(name):
     scheduled_times = next_scheduled_times(state, count)
     today_tag = datetime.datetime.utcnow().strftime("%Y%m%d")
 
-    manifest_items = []
+    # FIX 2026-08-26 (round 5, scaling): this used to generate one slide at
+    # a time -- submit, block until done (up to 3 min in practice with real
+    # credits), download, repeat. Confirmed live (run #8) that took 14m34s
+    # for just 3 items. Now: build every item's directory/prompts first
+    # WITHOUT generating anything, collect every slide across every item
+    # into one flat job list, and hand the whole batch to
+    # higgsfield_client.generate_images_concurrent() in a single call so
+    # all slides across all items generate in parallel (see that function's
+    # docstring). Carousel rendering happens in a second pass once every
+    # job has a result. This is what lets adding more items/channels later
+    # NOT multiply the run's wall-clock time the way the old per-slide loop
+    # would have.
+    items_meta = []  # one entry per item: {item, bank_index, out_dir, prompts, job_start}
+    all_jobs = []
 
     for i in range(count):
         bank_index = (start_index + i) % len(bank)
@@ -147,18 +160,41 @@ def phase_generate(name):
         os.makedirs(item_out_dir, exist_ok=True)
 
         prompts = build_prompts(item)
-        photo_paths = []
+        job_start = len(all_jobs)
         for slide_i, prompt in enumerate(prompts, start=1):
             out_path = os.path.join(item_out_dir, f"source_{slide_i}.png")
-            try:
-                higgsfield_client.generate_image(prompt, out_path)
-                photo_paths.append(out_path)
-            except higgsfield_client.GenerationBlocked:
+            all_jobs.append({"prompt": prompt, "out_path": out_path})
+
+        items_meta.append({
+            "item": item,
+            "bank_index": bank_index,
+            "out_dir": item_out_dir,
+            "num_slides": len(prompts),
+            "job_start": job_start,
+        })
+
+    print(f"[INFO] Submitting {len(all_jobs)} image generation jobs for '{name}' (up to 5 concurrent)...")
+    job_results, job_errors = higgsfield_client.generate_images_concurrent(all_jobs, max_workers=5)
+
+    manifest_items = []
+    for i, meta in enumerate(items_meta):
+        item = meta["item"]
+        bank_index = meta["bank_index"]
+        item_out_dir = meta["out_dir"]
+        job_start = meta["job_start"]
+        photo_paths = []
+        for slide_i in range(1, meta["num_slides"] + 1):
+            job_index = job_start + slide_i - 1
+            path = job_results[job_index]
+            err = job_errors[job_index]
+            if path is not None:
+                photo_paths.append(path)
+            elif isinstance(err, higgsfield_client.GenerationBlocked):
                 print(f"[SAFETY] Slide {slide_i} of '{item['title']}' was flagged nsfw by Higgsfield -- "
                       f"skipping this photo, slide will render on a placeholder background instead.")
                 photo_paths.append(None)
-            except higgsfield_client.GenerationFailed as e:
-                print(f"[WARN] Slide {slide_i} of '{item['title']}' failed to generate: {e} -- using placeholder.")
+            else:
+                print(f"[WARN] Slide {slide_i} of '{item['title']}' failed to generate: {err} -- using placeholder.")
                 photo_paths.append(None)
 
         slide_paths = make_slides.render_carousel(item, bank_index, item_out_dir, photo_paths=photo_paths)

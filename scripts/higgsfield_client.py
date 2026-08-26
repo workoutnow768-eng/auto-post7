@@ -16,6 +16,7 @@ blindly forever.
 import os
 import time
 import requests
+import concurrent.futures
 
 BASE_URL = "https://platform.higgsfield.ai"
 # FIX 2026-08-26: this was missing "/v2/" -- confirmed against the live docs
@@ -123,3 +124,63 @@ def generate_image(prompt, out_path, aspect_ratio="3:4", resolution="720p", max_
             last_err = e
             time.sleep(3)
     raise GenerationFailed(f"Failed after {max_retries} attempts: {last_err}")
+
+
+# FIX 2026-08-26 (round 5, scaling): generate_image() was being called in a
+# plain sequential for-loop, one slide at a time -- submit, then block on
+# poll_until_done (up to 180s), then download, THEN move to the next slide.
+# Confirmed live (run #8, first run with real credits): the "Generate
+# recipe carousels" step alone took 14m34s for just 3 items -- with real
+# images actually taking 1-3 min each to generate, that's ~N * per-image-
+# time, which stops being viable once this scales past 2 pipelines (8+
+# channels would mean 8x the sequential wait, potentially over an hour per
+# run). Since each generate_image() call is I/O-bound (waiting on HTTP
+# requests, not CPU work), Python threads work fine here despite the GIL --
+# they're blocked on network I/O, which releases the GIL. This runs N jobs
+# concurrently (capped by max_workers) instead of one at a time, so total
+# wall-clock time approaches the slowest single image instead of the sum
+# of all of them.
+def generate_images_concurrent(jobs, max_workers=5):
+    """
+    jobs: list of dicts, each with at least {"prompt": ..., "out_path": ...}
+    and optionally {"aspect_ratio": ..., "resolution": ...}.
+
+    Returns (results, errors) -- both lists the same length/order as jobs.
+    results[i] is the out_path on success, None on failure/nsfw-block.
+    errors[i] is None on success, or the GenerationBlocked/GenerationFailed
+    exception instance on failure -- callers use this to tell a safety
+    block apart from a plain failure (same distinction the old sequential
+    per-slide try/except made) and to log the same [SAFETY]/[WARN] lines
+    as before.
+
+    max_workers=5 is a conservative default -- deliberately not "as many as
+    there are jobs" to avoid hammering Higgsfield's API with a burst of
+    concurrent submissions from a single run. Tune upward if Higgsfield's
+    rate limits comfortably allow it.
+    """
+    results = [None] * len(jobs)
+    errors = [None] * len(jobs)
+
+    def _run_one(index, job):
+        try:
+            path = generate_image(
+                job["prompt"],
+                job["out_path"],
+                aspect_ratio=job.get("aspect_ratio", "3:4"),
+                resolution=job.get("resolution", "720p"),
+            )
+            return index, path, None
+        except (GenerationBlocked, GenerationFailed) as e:
+            return index, None, e
+
+    if not jobs:
+        return results, errors
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(jobs))) as pool:
+        futures = [pool.submit(_run_one, i, job) for i, job in enumerate(jobs)]
+        for future in concurrent.futures.as_completed(futures):
+            index, path, err = future.result()
+            results[index] = path
+            errors[index] = err
+
+    return results, errors
