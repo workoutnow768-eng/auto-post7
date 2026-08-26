@@ -19,6 +19,7 @@ Usage: python scripts/main.py generate recipe
        python scripts/main.py schedule recipe
 """
 import os
+import re
 import sys
 import json
 import datetime
@@ -130,7 +131,18 @@ def phase_generate(name):
     for i in range(count):
         bank_index = (start_index + i) % len(bank)
         item = bank[bank_index]
-        slug = item["title"].lower().replace(" ", "_").replace("(", "").replace(")", "").replace("/", "-")[:40]
+        # FIX 2026-08-26 (round 3): titles with punctuation like "?" or ":"
+        # (e.g. "Myth vs Fact: Does Cardio Kill Gains?") produced a folder
+        # name containing that punctuation, which broke the
+        # raw.githubusercontent.com URL handed to Buffer -- a bare "?" in a
+        # URL starts the query string, silently truncating the path before
+        # "/slide_1.png". Confirmed via a live Actions run log (run #7):
+        # "Buffer rejected the post ... Image could not be read from its
+        # URL." for exactly that item, while titles without punctuation
+        # scheduled fine. Now strips everything except lowercase
+        # letters/digits/underscores instead of only stripping parens.
+        slug = re.sub(r"[^a-z0-9_]+", "", item["title"].lower().replace(" ", "_"))
+        slug = re.sub(r"_+", "_", slug).strip("_")[:40]
         item_out_dir = os.path.join(REPO_ROOT, cfg["output_subdir"], f"{today_tag}_{slug}")
         os.makedirs(item_out_dir, exist_ok=True)
 
