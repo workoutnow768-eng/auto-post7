@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-08-26T16:30:09Z",
+  "start_index": 10,
+  "count": 3,
+  "final_scheduled_up_to": "2026-08-28T19:00:00Z",
+  "items": [
+    {
+      "title": "Form Fix: The Squat",
+      "bank_index": 10,
+      "text": "Your squats might be quietly wrecking your knees \u2014 here's the fix \ud83e\uddb5\ud83d\udd27\n\n#squatform #formcheck #fitnesstips #gymtiktok #fitnesstiktok",
+      "image_repo_paths": [
+        "output/workout/20260826_form_fix:_the_squat/slide_1.png",
+        "output/workout/20260826_form_fix:_the_squat/slide_2.png",
+        "output/workout/20260826_form_fix:_the_squat/slide_3.png",
+        "output/workout/20260826_form_fix:_the_squat/slide_4.png",
+        "output/workout/20260826_form_fix:_the_squat/slide_5.png"
+      ],
+      "scheduled_at": "2026-08-28T09:00:00Z"
+    },
+    {
+      "title": "Myth vs Fact: Does Cardio Kill Gains?",
+      "bank_index": 11,
+      "text": "The \"cardio kills gains\" myth needs to die \u2014 here's the actual research \ud83c\udfc3\u200d\u2642\ufe0f\ud83d\udcaa\n\n#cardiomyth #fitnessfacts #gymtok #fitnesstips #fitnesstiktok",
+      "image_repo_paths": [
+        "output/workout/20260826_myth_vs_fact:_does_cardio_kill_gains?/slide_1.png",
+        "output/workout/20260826_myth_vs_fact:_does_cardio_kill_gains?/slide_2.png",
+        "output/workout/20260826_myth_vs_fact:_does_cardio_kill_gains?/slide_3.png",
+        "output/workout/20260826_myth_vs_fact:_does_cardio_kill_gains?/slide_4.png"
+      ],
+      "scheduled_at": "2026-08-28T15:00:00Z"
+    },
+    {
+      "title": "3 Signs You're Overtraining",
+      "bank_index": 12,
+      "text": "More isn't always better \u2014 here's when to actually take a rest day \ud83d\ude34\ud83d\udea9\n\n#overtraining #recovery #fitnesstips #restday #fitnesstiktok",
+      "image_repo_paths": [
+        "output/workout/20260826_3_signs_you're_overtraining/slide_1.png",
+        "output/workout/20260826_3_signs_you're_overtraining/slide_2.png",
+        "output/workout/20260826_3_signs_you're_overtraining/slide_3.png",
+        "output/workout/20260826_3_signs_you're_overtraining/slide_4.png"
+      ],
+      "scheduled_at": "2026-08-28T19:00:00Z"
+    }
+  ]
+}
