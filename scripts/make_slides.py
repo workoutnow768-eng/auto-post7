@@ -212,7 +212,14 @@ def render_slide(slide_num, total_slides, heading, sub, palette, out_path, photo
     # it doesn't compete with real content there
     draw.rectangle([0, H - 10, W, H], fill=accent)
 
-    img.save(out_path)
+    # FIX 2026-08-26 (round 4): Instagram's Content Publishing API only
+    # accepts JPEG -- confirmed against Meta's own developer docs ("JPEG is
+    # the only image format supported... PNG is not supported") -- and a
+    # live Buffer queue error ("Instagram is reporting that the image
+    # format isn't supported") on a post using a .png. img is already RGB
+    # (no alpha channel survives _load_background/_draw_scrim/the dot
+    # overlay paste), so this is a safe straight re-encode.
+    img.save(out_path, "JPEG", quality=92)
     return out_path
 
 
@@ -255,7 +262,7 @@ def render_carousel(recipe, day_index, out_dir, photo_paths=None):
 
     paths = []
     for i, slide in enumerate(slides, start=1):
-        out_path = os.path.join(out_dir, f"slide_{i}.png")
+        out_path = os.path.join(out_dir, f"slide_{i}.jpg")
         photo = photo_paths[i - 1] if i - 1 < len(photo_paths) else None
         detail = slide.get("detail")
         render_slide(i, len(slides), slide["heading"], slide["sub"], palette, out_path, photo_path=photo, detail=detail,
