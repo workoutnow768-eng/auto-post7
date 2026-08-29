@@ -1,8 +1,8 @@
 {
   "_comment": "Bot-maintained rotation state for the fitness/workout pipeline, mirroring the manual workout-page/state.json this was seeded from. Do not hand-edit last_day_index/scheduled_up_to while the bot is running on schedule -- it owns these fields.",
-  "last_day_index": 18,
-  "scheduled_up_to": "2026-08-30T19:00:00Z",
-  "last_run_at": "2026-08-28T22:06:39Z",
+  "last_day_index": 21,
+  "scheduled_up_to": "2026-08-31T19:00:00Z",
+  "last_run_at": "2026-08-29T17:25:02Z",
   "last_run_slot": "github_actions_autonomous_bot",
   "posts_per_day": 3,
   "daily_time_slots_uk": [
