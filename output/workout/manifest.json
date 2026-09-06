@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-09-06T17:26:36Z",
+  "start_index": 43,
+  "count": 3,
+  "final_scheduled_up_to": "2026-09-08T19:00:00Z",
+  "items": [
+    {
+      "title": "Beginner Leg Day (Bodyweight)",
+      "bank_index": 1,
+      "text": "No gym, no gear \u2014 just a real beginner leg day that actually works \ud83e\uddb5\n\n#legday #beginnerworkout #bodyweight #homeworkout #fitnesstiktok",
+      "image_repo_paths": [
+        "output/workout/20260906_beginner_leg_day_bodyweight/slide_1.jpg",
+        "output/workout/20260906_beginner_leg_day_bodyweight/slide_2.jpg",
+        "output/workout/20260906_beginner_leg_day_bodyweight/slide_3.jpg",
+        "output/workout/20260906_beginner_leg_day_bodyweight/slide_4.jpg"
+      ],
+      "scheduled_at": "2026-09-08T09:00:00Z"
+    },
+    {
+      "title": "3 Dumbbell Moves for Bigger Arms",
+      "bank_index": 2,
+      "text": "3 moves, one set of dumbbells, real arm growth \ud83d\udcaa\ud83c\udfcb\ufe0f\n\n#armday #dumbbellworkout #bicepsandtriceps #gymtiktok #fitnesstiktok",
+      "image_repo_paths": [
+        "output/workout/20260906_3_dumbbell_moves_for_bigger_arms/slide_1.jpg",
+        "output/workout/20260906_3_dumbbell_moves_for_bigger_arms/slide_2.jpg",
+        "output/workout/20260906_3_dumbbell_moves_for_bigger_arms/slide_3.jpg",
+        "output/workout/20260906_3_dumbbell_moves_for_bigger_arms/slide_4.jpg"
+      ],
+      "scheduled_at": "2026-09-08T15:00:00Z"
+    },
+    {
+      "title": "10-Minute Morning Mobility Routine",
+      "bank_index": 3,
+      "text": "10 minutes before coffee changes how your whole day feels \ud83c\udf05\ud83e\uddd8\n\n#morningroutine #mobility #stretching #wellness #fitnesstiktok",
+      "image_repo_paths": [
+        "output/workout/20260906_10minute_morning_mobility_routine/slide_1.jpg",
+        "output/workout/20260906_10minute_morning_mobility_routine/slide_2.jpg",
+        "output/workout/20260906_10minute_morning_mobility_routine/slide_3.jpg",
+        "output/workout/20260906_10minute_morning_mobility_routine/slide_4.jpg"
+      ],
+      "scheduled_at": "2026-09-08T19:00:00Z"
+    }
+  ]
+}
