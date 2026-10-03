@@ -1,0 +1,13 @@
+{
+  "_comment": "Dog-fight video pipeline. Edit channels / times / caption freely. The bot owns last_index and scheduled_up_to.",
+  "channels": [],
+  "daily_time_slots_uk": ["12:00", "17:00", "20:00"],
+  "posts_per_day": 3,
+  "duration": 15,
+  "resolution": "720p",
+  "caption_template": "{rough} vs {posh} 🥊 Who's fighting next?",
+  "hashtags": "#ai #aivideo #dogs #fight #kickboxing #funny #fyp",
+  "last_index": 0,
+  "scheduled_up_to": null,
+  "last_run_at": null
+}

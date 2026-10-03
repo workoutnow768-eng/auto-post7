@@ -1,0 +1,62 @@
+name: Dog Fight Bot
+
+on:
+  schedule:
+    # 06:23 UTC daily -- off the hour (GitHub delays on-the-hour crons).
+    # Generates tomorrow's 3 episodes; video gen can take a while.
+    - cron: "23 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repo-push
+  cancel-in-progress: false
+
+jobs:
+  dogfight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements.txt
+
+      - name: Generate episodes (start frame -> video)
+        env:
+          HIGGSFIELD_API_KEY_ID: ${{ secrets.HIGGSFIELD_API_KEY_ID }}
+          HIGGSFIELD_API_KEY_SECRET: ${{ secrets.HIGGSFIELD_API_KEY_SECRET }}
+        run: python scripts/dogfight.py generate
+
+      - name: Commit + push videos (Buffer fetches them by URL)
+        run: |
+          git config user.name "social-bot"
+          git config user.email "social-bot@users.noreply.github.com"
+          # keep the repo small: drop episode folders older than 7 days
+          # (by the YYYYMMDD in the folder name -- checkout resets file mtimes)
+          CUTOFF=$(date -u -d '7 days ago' +%Y%m%d)
+          for d in output/dogfight/*/; do
+            n=$(basename "$d"); day=${n%%_*}
+            if [[ "$day" =~ ^[0-9]{8}$ && "$day" < "$CUTOFF" ]]; then git rm -rq --ignore-unmatch "$d"; fi
+          done
+          git add output/dogfight
+          git diff --cached --quiet || git commit -m "Dog fight: episodes $(date -u +%Y-%m-%d)"
+          git pull --rebase
+          git push
+
+      - name: Schedule on Buffer
+        env:
+          BUFFER_ACCESS_TOKEN_DOGS: ${{ secrets.BUFFER_ACCESS_TOKEN_DOGS }}
+        run: python scripts/dogfight.py schedule
+
+      - name: Commit state
+        run: |
+          git add state/dogfight_state.json output/dogfight
+          git diff --cached --quiet || git commit -m "Dog fight: state $(date -u +%Y-%m-%d)"
+          git pull --rebase
+          git push

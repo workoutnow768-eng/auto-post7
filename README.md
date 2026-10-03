@@ -199,3 +199,26 @@ in place and untouched as a manual fallback in case this bot needs
 debugging -- they still work whenever the user's laptop + Chrome are
 available. Once this bot is confirmed reliable for a few days, those can
 be disabled.
+
+## Dog Fight video pipeline (added 2026-10-03)
+
+Separate workflow: `.github/workflows/dogfight.yml` (06:23 UTC daily +
+manual "Run workflow"). Makes 3 episodes a day for the next day:
+
+1. Start frame -- Grok Image 2.0 (`/xai/grok-imagine-image-2.0`) with the
+   locked reference images in `scripts/dogfight_bank.py`.
+2. 15s 720p video with audio -- Seedance 2.0 image-to-video
+   (`/bytedance/seedance-2.0/image-to-video`).
+3. MP4s committed to `output/dogfight/` (folders older than 7 days are
+   deleted each run), then posted to Buffer as video (Instagram as a Reel).
+
+Setup:
+- Secret `BUFFER_ACCESS_TOKEN_DOGS` -- Buffer token from the account that
+  holds the dog channels. Higgsfield secrets are shared with the other
+  pipelines (credits come from cloud.higgsfield.ai, not the app).
+- Put the exact Buffer channel names in `channels` in
+  `state/dogfight_state.json`. Posting times, caption and hashtags live
+  there too.
+- Matchups, fighter looks and finishers: `scripts/dogfight_bank.py`.
+- Preview the next prompts without spending credits:
+  `python scripts/dogfight.py preview`

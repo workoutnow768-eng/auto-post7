@@ -210,3 +210,34 @@ def create_post(channel_name, text, image_urls, scheduled_at_iso8601, token_env)
     if "message" in payload:
         raise RuntimeError(f"Buffer rejected the post for '{channel_name}': {payload['message']}")
     return payload.get("post")
+
+
+# --- Video posts (dog-fight pipeline) ---
+# Asset shape per developers.buffer.com/examples/create-video-post.html:
+#   assets: [{video: {url, metadata: {thumbnailOffset: <ms>}}}]
+# Instagram needs a post type -- video goes out as a Reel. Facebook keeps
+# type "post" (same as the image pipelines). TikTok needs no metadata.
+_VIDEO_METADATA_BY_SERVICE = {
+    "instagram": lambda: {"instagram": {"type": "reel", "shouldShareToFeed": True}},
+    "facebook": lambda: {"facebook": {"type": "post"}},
+}
+
+
+def create_video_post(channel_name, text, video_url, scheduled_at_iso8601, token_env, thumbnail_offset_ms=2000):
+    channel = get_channel(channel_name, token_env)
+    post_input = {
+        "text": text,
+        "channelId": channel["id"],
+        "schedulingType": "automatic",
+        "mode": "customScheduled",
+        "dueAt": scheduled_at_iso8601,
+        "assets": [{"video": {"url": video_url, "metadata": {"thumbnailOffset": thumbnail_offset_ms}}}],
+    }
+    builder = _VIDEO_METADATA_BY_SERVICE.get((channel.get("service") or "").lower())
+    if builder:
+        post_input["metadata"] = builder()
+    result = _graphql(_CREATE_POST_MUTATION, token_env, {"input": post_input})
+    payload = result.get("createPost", {})
+    if "message" in payload:
+        raise RuntimeError(f"Buffer rejected the video post for '{channel_name}': {payload['message']}")
+    return payload.get("post")
