@@ -1,0 +1,18 @@
+{
+  "_comment": "State for the daily 'Dog fights' scheduled task. The task reads this, makes 2 new fights, queues them via the 'Upload to Buffer' workflow into the next 2 free slots after scheduled_up_to, then updates this file.",
+  "channels": "ai_clean,billybally2026,The Bloc Boyz",
+  "daily_slots_uk": ["12:00", "19:00"],
+  "scheduled_up_to_utc": "2026-11-06T12:00:00Z",
+  "start_frame_reference_job_id": "081f8710-41cd-41a7-a1c8-65fc2adbb38f",
+  "used_fighter_breeds": [
+    "Staffordshire Bull Terrier", "Poodle", "Boxer", "Afghan Hound", "Labradoodle", "English Bull Terrier",
+    "Cockapoo", "French Bulldog", "Chihuahua", "Siberian Husky", "Pug", "German Shepherd", "Corgi",
+    "English Bulldog", "Border Collie", "Rottweiler", "Dachshund", "Great Dane", "Jack Russell Terrier",
+    "American Pit Bull Terrier", "Shih Tzu", "Shar Pei", "Dalmatian", "Akita", "Beagle", "Cane Corso",
+    "Pomeranian", "Belgian Malinois", "Greyhound", "Golden Retriever", "Chow Chow", "Yorkshire Terrier",
+    "Bloodhound", "American Bully", "Bichon Frise", "Boston Terrier", "Saint Bernard", "Weimaraner",
+    "Basset Hound", "Kangal", "Samoyed", "Shiba Inu", "Dogue de Bordeaux", "Rhodesian Ridgeback",
+    "Pekingese", "Doberman", "Lurcher"
+  ],
+  "log": []
+}
