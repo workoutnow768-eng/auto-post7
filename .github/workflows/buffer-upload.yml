@@ -1,0 +1,50 @@
+name: Upload to Buffer
+
+# Manual only -- triggered per batch of hand-made dog-fight videos.
+on:
+  workflow_dispatch:
+    inputs:
+      posts:
+        description: 'JSON list: [{"video_url","caption","scheduled_at"}]'
+        required: true
+      channels:
+        description: "Comma-separated Buffer channel names"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repo-push
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+
+      - name: Download videos
+        env:
+          POSTS_JSON: ${{ inputs.posts }}
+        run: python scripts/buffer_upload.py download
+
+      - name: Commit + push videos (Buffer reads them by URL)
+        run: |
+          git config user.name "social-bot"
+          git config user.email "social-bot@users.noreply.github.com"
+          git add output/buffer_uploads
+          git commit -qm "Buffer upload: $(date -u +%Y-%m-%dT%H:%M)"
+          git pull --rebase -q
+          git push -q
+
+      - name: Schedule on Buffer
+        env:
+          BUFFER_ACCESS_TOKEN_DOGS: ${{ secrets.BUFFER_ACCESS_TOKEN_DOGS }}
+          BUFFER_CHANNELS: ${{ inputs.channels }}
+        run: python scripts/buffer_upload.py schedule
