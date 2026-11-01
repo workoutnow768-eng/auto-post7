@@ -233,9 +233,16 @@ def create_video_post(channel_name, text, video_url, scheduled_at_iso8601, token
         "dueAt": scheduled_at_iso8601,
         "assets": [{"video": {"url": video_url, "metadata": {"thumbnailOffset": thumbnail_offset_ms}}}],
     }
-    builder = _VIDEO_METADATA_BY_SERVICE.get((channel.get("service") or "").lower())
+    service = (channel.get("service") or "").lower()
+    builder = _VIDEO_METADATA_BY_SERVICE.get(service)
     if builder:
         post_input["metadata"] = builder()
+    elif service == "youtube":
+        # Buffer rejects YouTube posts without a title and a category
+        # ("YouTube posts require a title/category"). Title = first line of
+        # the caption, capped at YouTube's 100 chars. 24 = Entertainment.
+        title = (text.strip().splitlines() or ["Dog fight"])[0][:100]
+        post_input["metadata"] = {"youtube": {"title": title, "categoryId": "24"}}
     result = _graphql(_CREATE_POST_MUTATION, token_env, {"input": post_input})
     payload = result.get("createPost", {})
     if "message" in payload:
