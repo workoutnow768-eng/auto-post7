@@ -46,7 +46,6 @@ jobs:
           done
           git add output/dogfight
           git diff --cached --quiet || git commit -m "Dog fight: episodes $(date -u +%Y-%m-%d)"
-          git pull --rebase
           git push
 
       - name: Schedule on Buffer
@@ -58,5 +57,4 @@ jobs:
         run: |
           git add state/dogfight_state.json output/dogfight
           git diff --cached --quiet || git commit -m "Dog fight: state $(date -u +%Y-%m-%d)"
-          git pull --rebase
           git push

@@ -40,7 +40,7 @@ jobs:
           git config user.email "social-bot@users.noreply.github.com"
           git add output/buffer_uploads
           git commit -qm "Buffer upload: $(date -u +%Y-%m-%dT%H:%M)"
-          git pull --rebase -q
+
           git push -q
 
       - name: Schedule on Buffer
