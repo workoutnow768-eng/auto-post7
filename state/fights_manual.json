@@ -5,7 +5,7 @@
     "12:00",
     "19:00"
   ],
-  "scheduled_up_to_utc": "2026-11-15T19:00:00Z",
+  "scheduled_up_to_utc": "2026-11-16T19:00:00Z",
   "start_frame_reference_job_id": "081f8710-41cd-41a7-a1c8-65fc2adbb38f",
   "used_fighter_breeds": [
     "Staffordshire Bull Terrier",
@@ -74,7 +74,11 @@
     "Dogo Argentino",
     "Lhasa Apso",
     "Borzoi",
-    "Norwich Terrier"
+    "Norwich Terrier",
+    "Boerboel",
+    "Maltese",
+    "Caucasian Shepherd",
+    "Whippet"
   ],
   "log": [
     "2026-11-02: Bullmastiff vs Bedlington Terrier @ 2026-11-06T19:00:00Z (2nd fight skipped: Komondor vs Miniature Schnauzer and retry Irish Wolfhound vs West Highland Terrier both ip_detected)",
@@ -82,6 +86,7 @@
     "2026-11-04: Leonberger vs Papillon @ 2026-11-08T12:00:00Z, Bernese Mountain Dog vs Chinese Crested @ 2026-11-08T19:00:00Z",
     "2026-11-05: Neapolitan Mastiff vs Miniature Pinscher @ 2026-11-09T12:00:00Z, Alaskan Malamute vs Cavalier King Charles Spaniel @ 2026-11-09T19:00:00Z",
     "2026-11-06: Tibetan Mastiff vs Scottish Terrier @ 2026-11-10T12:00:00Z (2nd fight skipped: Dogo Argentino vs Lhasa Apso video not submitted - Higgsfield out of credits)",
-    "2026-11-15: Dogo Argentino vs Lhasa Apso @ 2026-11-15T12:00:00Z, Borzoi vs Norwich Terrier @ 2026-11-15T19:00:00Z"
+    "2026-11-15: Dogo Argentino vs Lhasa Apso @ 2026-11-15T12:00:00Z, Borzoi vs Norwich Terrier @ 2026-11-15T19:00:00Z",
+    "2026-11-16: Boerboel vs Maltese @ 2026-11-16T12:00:00Z, Caucasian Shepherd vs Whippet @ 2026-11-16T19:00:00Z"
   ]
 }
