@@ -5,7 +5,7 @@
     "12:00",
     "19:00"
   ],
-  "scheduled_up_to_utc": "2026-11-24T19:00:00Z",
+  "scheduled_up_to_utc": "2026-11-25T19:00:00Z",
   "start_frame_reference_job_id": "081f8710-41cd-41a7-a1c8-65fc2adbb38f",
   "used_fighter_breeds": [
     "Staffordshire Bull Terrier",
@@ -106,7 +106,11 @@
     "Sphynx (cat)",
     "Labrador Retriever",
     "Kangaroo",
-    "Capybara"
+    "Capybara",
+    "Goat",
+    "Maine Coon (cat)",
+    "Anatolian Shepherd",
+    "Silky Terrier"
   ],
   "log": [
     "2026-11-02: Bullmastiff vs Bedlington Terrier @ 2026-11-06T19:00:00Z (2nd fight skipped: Komondor vs Miniature Schnauzer and retry Irish Wolfhound vs West Highland Terrier both ip_detected)",
@@ -122,6 +126,7 @@
     "2026-11-21: Giant Schnauzer vs Coton de Tulear @ 2026-11-21T12:00:00Z, Ibizan Hound vs Cocker Spaniel @ 2026-11-21T19:00:00Z (first picks Black Russian Terrier vs Havanese and Vizsla vs Cairn Terrier both ip_detected)",
     "2026-11-22: Airedale Terrier vs Irish Setter @ 2026-11-22T12:00:00Z, Black and Tan Coonhound vs Schipperke @ 2026-11-22T19:00:00Z (first pick Tosa Inu vs Toy Fox Terrier ip_detected)",
     "2026-11-23: Bergamasco vs Skye Terrier @ 2026-11-23T12:00:00Z, German Shorthaired Pointer vs Sussex Spaniel @ 2026-11-23T19:00:00Z",
-    "2026-11-24: Sphynx (cat) vs Labrador Retriever @ 2026-11-24T12:00:00Z, Kangaroo vs Capybara @ 2026-11-24T19:00:00Z"
+    "2026-11-24: Sphynx (cat) vs Labrador Retriever @ 2026-11-24T12:00:00Z, Kangaroo vs Capybara @ 2026-11-24T19:00:00Z",
+    "2026-11-25: Goat vs Maine Coon (cat) @ 2026-11-25T12:00:00Z, Anatolian Shepherd vs Silky Terrier @ 2026-11-25T19:00:00Z"
   ]
 }
